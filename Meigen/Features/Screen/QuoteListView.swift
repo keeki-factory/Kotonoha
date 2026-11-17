@@ -79,6 +79,7 @@ struct QuoteListView: View {
                         existingImageFilename: oldFilename
                     )
                 }
+                .interactiveDismissDisabled()
             }
             .onOpenURL { url in
                 guard url.scheme == "meigen",
