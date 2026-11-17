@@ -9,9 +9,14 @@
 import WidgetKit
 import SwiftUI
 import SwiftData
+import AppIntents
 
 // 表示するデータの提供
-struct Provider: TimelineProvider {
+struct Provider: AppIntentTimelineProvider {
+    
+    typealias Entry = MeigenEntry
+    typealias Intent = FavoriteBook
+    
     
     func placeholder(in context: Context) -> MeigenEntry {
         MeigenEntry(
@@ -21,27 +26,34 @@ struct Provider: TimelineProvider {
         )
     }
     
-    func getSnapshot(in context: Context, completion: @escaping @Sendable (MeigenEntry) -> Void) {
-        completion(
-            MeigenEntry(
+    func snapshot(for configuration: FavoriteBook, in context: Context) async -> MeigenEntry {
+            return MeigenEntry(
                 date: Date(),
-                text: "Sample",
+                text: "Sampl",
                 fileNamePath: nil
             )
-        )
     }
     
-    func getTimeline(in context: Context, completion: @escaping @Sendable (Timeline<MeigenEntry>) -> Void) {
+    func timeline(for configuration: FavoriteBook, in context: Context) async -> Timeline<MeigenEntry>  {
         let currentDate = Date()
         let entry = fetchRandomMeigen()
-        let nextUpdateDate = Calendar.current.date(byAdding: .minute, value: 5, to: currentDate)!
+        
+        switch configuration.mode {
+        case .random:
+            let nextUpdateDate = Calendar.current.date(byAdding: .second, value: configuration.$span.wrappedValue.meigenSpan, to: currentDate)!
 
-        completion(
-            Timeline(
+            return Timeline(
                 entries: [entry],
                 policy: .after(nextUpdateDate)
             )
-        )
+        case .single:
+            // TODO: 固定表示を行う。
+            configuration
+            return Timeline(
+                entries: [entry],
+                policy: .never
+            )
+        }
     }
     
     func fetchRandomMeigen() -> MeigenEntry {
@@ -63,7 +75,7 @@ struct Provider: TimelineProvider {
             } else {
                 return MeigenEntry(
                     date: .now,
-                    text: "Sample",
+                    text: "Sampl",
                     fileNamePath: nil
                 )
             }
@@ -149,12 +161,155 @@ struct MeigenWidget: Widget {
     let kind: String = "MeigenWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+        AppIntentConfiguration(
+            kind: kind,
+            intent: FavoriteBook.self,
+            provider: Provider()
+        ) { entry in
             MeigenWidgetEntryView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
         .contentMarginsDisabled()
     }
+}
+
+// Stringに準拠する？
+// AppEnumへの準拠条件は？
+enum MeigenDisplayMode: String, AppEnum {
+    case single
+    case random
+    
+    // 型全体の解説
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Meigen表示設定"
+    
+    // 個々のケースの解説
+    static let caseDisplayRepresentations: [Self : DisplayRepresentation] = [
+        .single: "固定",
+        .random: "ランダム",
+    ]
+}
+
+enum MeigenUpdateSpan: String, AppEnum {
+    case min15
+    case min30
+    case hour1
+    case hour3
+    case hour6
+    case hour12
+    
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "更新間隔"
+    static let caseDisplayRepresentations: [MeigenUpdateSpan : DisplayRepresentation] = [
+        .min15: "15分",
+        .min30: "30分",
+        .hour1: "1時間",
+        .hour3: "3時間",
+        .hour6: "6時間",
+        .hour12: "12時間"
+    ]
+}
+
+extension MeigenUpdateSpan {
+    var meigenSpan: Int {
+        switch self {
+        case .min15: return 15 * 60
+        case .min30: return 30 * 60
+        case .hour1: return 1 * 60 * 60
+        case .hour3: return 3 * 60 * 60
+        case .hour6: return 6 * 60 * 60
+        case .hour12: return 12 * 60 * 60
+        @unknown default: return 24 * 60 * 60
+        }
+    }
+}
+
+
+struct MeigenEntity: AppEntity {
+    
+    static var defaultQuery = MeigenQuery()
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "取得"
+    
+    let id: QuoteRecord.ID
+    var text: String
+    var author: String?
+    var path: String?
+//    static let typeDisplayRepresentation: TypeDisplayRepresentation
+    
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(
+            title: "\(self.text)",
+            subtitle: "\(self.author ?? "unknown")",
+            image: nil
+        )
+    }
+    
+    init(record: QuoteRecord) {
+        self.id = record.id
+        self.text = record.text
+        self.author = record.author
+        self.path = record.imageFilename
+    }
+    
+}
+
+struct MeigenQuery: EntityQuery {
+
+    func entities(
+        for identifiers: [MeigenEntity.ID]
+    ) async throws -> [MeigenEntity] {
+        let container = try SharedModelContainer.create()
+        let context = ModelContext(container)
+        let descriptor = FetchDescriptor<QuoteRecord>(
+            sortBy: [
+                SortDescriptor(\.createdAt, order: .reverse)
+            ]
+        )
+        return try context.fetch(descriptor).filter { identifiers.contains($0.id) }.map{ MeigenEntity(record: $0) }
+    }
+
+    func suggestedEntities() async throws -> [MeigenEntity] {
+        let container = try SharedModelContainer.create()
+        let context = ModelContext(container)
+        let descriptor = FetchDescriptor<QuoteRecord>(
+            sortBy: [
+                SortDescriptor(\.createdAt, order: .reverse)
+            ]
+        )
+        let models = try context.fetch(descriptor).map{MeigenEntity(record: $0)}
+        return models
+    }
+}
+
+// AppIntentConfiguration
+struct FavoriteBook: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "Favorite Book"
+    static var description = IntentDescription("Shows a picture of your favorite book!")
+    
+    @Parameter(title: "DisplayMode", default: .random)
+    var mode: MeigenDisplayMode
+    
+    @Parameter(title: "UpdateSpan", default: .min30)
+    var span: MeigenUpdateSpan
+    
+    @Parameter(title: "FixedMeigen", default: nil)
+    var meigen: MeigenEntity?
+    
+    static var parameterSummary: some ParameterSummary {
+        Switch(\.$mode) {
+            Case(.random) {
+                Summary {
+                    \.$mode
+                    \.$span
+                }
+            }
+            DefaultCase() {
+                Summary {
+                    \.$mode
+                    \.$meigen
+                }
+            }
+        }
+    }
+    
 }
 
 #Preview(as: .systemSmall) {
