@@ -79,12 +79,15 @@ struct QuoteCardView: View {
                 )
                 .frame(height: 30)
             VStack(alignment: .leading, spacing: 6) {
-                Text("“\(quote.text)”")
-                    .font(.system(size: 25, weight: .semibold, design: .serif))
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.6)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity)
+                HStack {
+                    Text("“\(quote.text)”")
+                        .font(.system(size: 25, weight: .semibold, design: .serif))
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.6)
+                        .multilineTextAlignment(.leading)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
 
                 metadata(alignment: .leading)
             }
