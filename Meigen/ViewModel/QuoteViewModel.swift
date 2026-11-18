@@ -33,7 +33,8 @@ final class QuoteViewModel {
         author: String?,
         detail: String?,
         imageData: Data?,
-        existingImageFilename: String?
+        existingImageFilename: String?,
+        cardType: CardType
     ) {
         guard Quote.validate(text: text) == nil else {
             errorMessage = Quote.validate(text: text)
@@ -56,6 +57,7 @@ final class QuoteViewModel {
                 id: id ?? UUID(),
                 text: text.trimmingCharacters(in: .whitespacesAndNewlines),
                 source: source, author: author, detail: detail,
+                cardType: cardType,
                 imageFilename: filename,
                 createdAt: old?.createdAt ?? .now,
                 updatedAt: .now

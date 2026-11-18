@@ -72,11 +72,11 @@ struct QuoteListView: View {
                 QuoteEditorView(
                     quote: editingQuote,
                     initialImage: editingQuote.flatMap { model.image(for: $0) }
-                ) { text, source, author, detail, imageData, oldFilename in
+                ) { text, source, author, detail, imageData, oldFilename, cardType in
                     model.save(
                         id: editingQuote?.id, text: text, source: source,
                         author: author, detail: detail, imageData: imageData,
-                        existingImageFilename: oldFilename
+                        existingImageFilename: oldFilename, cardType: cardType
                     )
                 }
                 .interactiveDismissDisabled()

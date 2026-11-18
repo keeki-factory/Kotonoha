@@ -8,6 +8,7 @@ final class QuoteRecord {
     var source: String?
     var author: String?
     var detail: String?
+    var cardTypeRawValue: String?
     var imageFilename: String?
     var createdAt: Date
     var updatedAt: Date
@@ -18,6 +19,7 @@ final class QuoteRecord {
         source = quote.source
         author = quote.author
         detail = quote.detail
+        cardTypeRawValue = quote.cardType.rawValue
         imageFilename = quote.imageFilename
         createdAt = quote.createdAt
         updatedAt = quote.updatedAt
@@ -26,7 +28,8 @@ final class QuoteRecord {
     func asDomain() -> Quote {
         Quote(
             id: id, text: text, source: source, author: author,
-            detail: detail, imageFilename: imageFilename,
+            detail: detail, cardType: cardTypeRawValue.flatMap(CardType.init(rawValue:)) ?? .image,
+            imageFilename: imageFilename,
             createdAt: createdAt, updatedAt: updatedAt
         )
     }
@@ -36,6 +39,7 @@ final class QuoteRecord {
         source = quote.source
         author = quote.author
         detail = quote.detail
+        cardTypeRawValue = quote.cardType.rawValue
         imageFilename = quote.imageFilename
         updatedAt = .now
     }

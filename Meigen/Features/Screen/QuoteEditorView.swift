@@ -1,66 +1,93 @@
 import SwiftUI
 import PhotosUI
 
+@Observable
+class QuoteEditorViewModel {
+    var quote: Quote?
+    var text: String
+    var source: String
+    var author: String
+    var detail: String
+    var selectedPhoto: PhotosPickerItem?
+    var imageData: Data?
+    var imagePreview: UIImage?
+    var validationError: String?
+    var cardType: CardType
+    
+    init(quote: Quote?, initialImage: UIImage?, onSave: @escaping (String, String?, String?, String?, Data?, String?, CardType) -> Void) {
+        self.quote = quote
+        self.text = quote?.text ?? ""
+        self.source = quote?.source ?? ""
+        self.author = quote?.author ?? ""
+        self.detail = quote?.detail ?? ""
+        self.imagePreview = initialImage
+        self.cardType = quote?.cardType ?? .image
+    }
+}
+
+struct QuoteEditorPreview: View {
+    @Binding var quoteEditorViewModel: QuoteEditorViewModel
+    var body: some View {
+        
+    }
+}
+
 struct QuoteEditorView: View {
-    let quote: Quote?
-    let onSave: (String, String?, String?, String?, Data?, String?) -> Void
+//    let quote: Quote?
+    let onSave: (String, String?, String?, String?, Data?, String?, CardType) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var text: String
-    @State private var source: String
-    @State private var author: String
-    @State private var detail: String
-    @State private var selectedPhoto: PhotosPickerItem?
-    @State private var imageData: Data?
-    @State private var imagePreview: UIImage?
-    @State private var validationError: String?
+    @State var quoteEditorViewModel: QuoteEditorViewModel
+    
 
-    init(quote: Quote?, initialImage: UIImage?, onSave: @escaping (String, String?, String?, String?, Data?, String?) -> Void) {
-        self.quote = quote
+    init(quote: Quote?, initialImage: UIImage?, onSave: @escaping (String, String?, String?, String?, Data?, String?, CardType) -> Void) {
         self.onSave = onSave
-        _text = State(initialValue: quote?.text ?? "")
-        _source = State(initialValue: quote?.source ?? "")
-        _author = State(initialValue: quote?.author ?? "")
-        _detail = State(initialValue: quote?.detail ?? "")
-        _imagePreview = State(initialValue: initialImage)
+        _quoteEditorViewModel = State(initialValue: .init(quote: quote, initialImage: initialImage, onSave: onSave))
     }
 
     var body: some View {
         NavigationStack {
+            QuoteCardPreView(
+                quoteEditorViewModel: $quoteEditorViewModel
+            )
             Form {
                 Section("名言") {
-                    TextEditor(text: $text)
+                    TextEditor(text: $quoteEditorViewModel.text)
                         .frame(minHeight: 110)
-                    if let validationError {
+                    if let validationError = quoteEditorViewModel.validationError {
                         Text(validationError).font(.caption).foregroundStyle(.red)
                     }
                 }
                 Section("情報（任意）") {
-                    TextField("発言者", text: $author)
-                    TextField("出典・引用元", text: $source)
-                    TextField("詳細・メモ", text: $detail, axis: .vertical)
+                    TextField("発言者", text: $quoteEditorViewModel.author)
+                    TextField("出典・引用元", text: $quoteEditorViewModel.source)
+                    TextField("詳細・メモ", text: $quoteEditorViewModel.detail, axis: .vertical)
                         .lineLimit(3...7)
+                    Picker("カードの種類", selection: $quoteEditorViewModel.cardType) {
+                        Text("text").tag(CardType.text)
+                        Text("image").tag(CardType.image)
+                    }
                 }
                 Section("背景画像") {
-                    if let imagePreview {
+                    if let imagePreview = quoteEditorViewModel.imagePreview {
                         Image(uiImage: imagePreview)
                             .resizable().scaledToFill()
                             .frame(height: 160).frame(maxWidth: .infinity)
                             .clipped().clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                    PhotosPicker(selection: $quoteEditorViewModel.selectedPhoto, matching: .images) {
                         Label("写真を選択", systemImage: "photo")
                     }
-                    if imagePreview != nil {
+                    if quoteEditorViewModel.imagePreview != nil {
                         Button("画像を外す", role: .destructive) {
-                            imagePreview = nil
-                            imageData = nil
-                            selectedPhoto = nil
+                            quoteEditorViewModel.imagePreview = nil
+                            quoteEditorViewModel.imageData = nil
+                            quoteEditorViewModel.selectedPhoto = nil
                         }
                     }
                 }
             }
-            .navigationTitle(quote == nil ? "名言を追加" : "名言を編集")
+            .navigationTitle(quoteEditorViewModel.quote == nil ? "名言を追加" : "名言を編集")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -68,22 +95,29 @@ struct QuoteEditorView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("保存") {
-                        guard Quote.validate(text: text) == nil else {
-                            validationError = "名言を入力してください。"
+                        guard Quote.validate(text: quoteEditorViewModel.text) == nil else {
+                            quoteEditorViewModel.validationError = "名言を入力してください。"
                             return
                         }
-                        onSave(text, source, author, detail, imageData, (imagePreview == nil ? nil : quote?.imageFilename))
+                        onSave(
+                            quoteEditorViewModel.text,
+                            quoteEditorViewModel.source,
+                            quoteEditorViewModel.author,
+                            quoteEditorViewModel.detail,
+                            quoteEditorViewModel.imageData,
+                            (quoteEditorViewModel.imagePreview == nil ? nil : quoteEditorViewModel.quote?.imageFilename),
+                            quoteEditorViewModel.cardType)
                         dismiss()
                     }
                     .fontWeight(.semibold)
                 }
             }
-            .onChange(of: selectedPhoto) { _, item in
+            .onChange(of: quoteEditorViewModel.selectedPhoto) { _, item in
                 Task {
                     guard let data = try? await item?.loadTransferable(type: Data.self),
                           let image = UIImage(data: data) else { return }
-                    imageData = data
-                    imagePreview = image
+                    quoteEditorViewModel.imageData = data
+                    quoteEditorViewModel.imagePreview = image
                 }
             }
         }
