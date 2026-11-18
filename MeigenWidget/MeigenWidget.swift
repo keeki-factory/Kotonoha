@@ -48,11 +48,27 @@ struct Provider: AppIntentTimelineProvider {
             )
         case .single:
             // TODO: 固定表示を行う。
-            configuration
-            return Timeline(
-                entries: [entry],
-                policy: .never
-            )
+            if let meigen = configuration.meigen {
+                let entry = MeigenEntry(
+                    date: Date(),
+                    text: meigen.text,
+                    fileNamePath: meigen.path
+                )
+                return Timeline(
+                    entries: [entry],
+                    policy: .never
+                )
+            } else {
+                let entry = MeigenEntry(
+                    date: Date(),
+                    text: "名言が見つかりません",
+                    fileNamePath: nil
+                )
+                return Timeline(
+                    entries: [entry],
+                    policy: .never
+                )
+            }
         }
     }
     
@@ -125,11 +141,15 @@ struct MeigenWidgetEntryView : View {
                                 .shadow(color: .black, radius: 10, x: 0, y: 0)
                                 .lineLimit(2)
                                 .minimumScaleFactor(0.5)
+                                .frame(
+                                    width: geometry.size.width,
+                                    height: geometry.size.height*0.2
+                                )
                                 .background(
                                     LinearGradient(
                                         stops: [
                                             .init(color: .clear, location: 0.0),
-                                            .init(color: .black.opacity(0.8), location: 0.1),
+                                            .init(color: .black.opacity(0.8), location: 0.2),
                                             .init(color: .black.opacity(0.8), location: 1.0),
                                         ],
                                         startPoint: .top,
